@@ -70,6 +70,8 @@ _atmosphere_images:
   heat_engine_cleaner: "registry.atmosphere.dev/library/heat:{{ atmosphere_release }}"
   heat_engine: "registry.atmosphere.dev/library/heat:{{ atmosphere_release }}"
   heat_purge_deleted: "registry.atmosphere.dev/library/heat:{{ atmosphere_release }}"
+  # helm_tests is using in redis charts
+  helm_tests: docker.io/redislabs/redis-py:latest
   horizon_db_sync: "registry.atmosphere.dev/library/horizon:{{ atmosphere_release }}"
   horizon: "registry.atmosphere.dev/library/horizon:{{ atmosphere_release }}"
   ingress_nginx_controller: registry.k8s.io/ingress-nginx/controller:v1.10.0
@@ -187,6 +189,7 @@ _atmosphere_images:
   rabbitmq_credential_updater: docker.io/rabbitmqoperator/default-user-credential-updater:1.0.4
   rabbitmq_server: docker.io/library/rabbitmq:3.11.28-management
   rabbitmq_topology_operator: docker.io/rabbitmqoperator/messaging-topology-operator:1.13.0
+  redis: docker.io/library/redis:4.0.1
   rook_ceph: docker.io/rook/ceph:v1.14.2
   secretgen_controller: ghcr.io/carvel-dev/secretgen-controller@sha256:59ec05ce5847bfd70c8e04f08b5195e918c8f6fbb947ffc91b456494a2958fd5
   senlin_api: "registry.atmosphere.dev/library/senlin:{{ atmosphere_release }}"
