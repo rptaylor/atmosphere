@@ -1,0 +1,202 @@
+{{/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{- if .Values.manifests.deployment }}
+{{- $envAll := . }}
+
+{{- $mounts_coriolis := .Values.pod.mounts.coriolis_web.coriolis_web }}
+{{- $mounts_coriolis_init := .Values.pod.mounts.coriolis_web.init_container }}
+
+{{- $serviceAccountName := "coriolis-web" }}
+{{ tuple $envAll "web" $serviceAccountName | include "helm-toolkit.snippets.kubernetes_pod_rbac_serviceaccount" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coriolis-web
+  annotations:
+    {{ tuple $envAll | include "helm-toolkit.snippets.release_uuid" }}
+  labels:
+{{ tuple $envAll "coriolis" "web" | include "helm-toolkit.snippets.kubernetes_metadata_labels" | indent 4 }}
+spec:
+  replicas: {{ .Values.pod.replicas.web }}
+  selector:
+    matchLabels:
+{{ tuple $envAll "coriolis" "web" | include "helm-toolkit.snippets.kubernetes_metadata_labels" | indent 6 }}
+{{ tuple $envAll | include "helm-toolkit.snippets.kubernetes_upgrades_deployment" | indent 2 }}
+  template:
+    metadata:
+      labels:
+{{ tuple $envAll "coriolis" "web" | include "helm-toolkit.snippets.kubernetes_metadata_labels" | indent 8 }}
+      annotations:
+{{ tuple $envAll | include "helm-toolkit.snippets.release_uuid" | indent 8 }}
+        configmap-bin-hash: {{ tuple "configmap-bin.yaml" . | include "helm-toolkit.utils.hash" }}
+        configmap-etc-hash: {{ tuple "configmap-etc.yaml" . | include "helm-toolkit.utils.hash" }}
+{{ tuple "coriolis" . | include "helm-toolkit.snippets.custom_pod_annotations" | indent 8 }}
+{{- if .Values.manifests.configmap_logo }}
+        configmap-logo-hash: {{ tuple "configmap-logo.yaml" . | include "helm-toolkit.utils.hash" }}
+{{- end }}
+{{ dict "envAll" $envAll "podName" "coriolis" "containerNames" (list "coriolis" "init" ) | include "helm-toolkit.snippets.kubernetes_mandatory_access_control_annotation" | indent 8 }}
+    spec:
+      serviceAccountName: {{ $serviceAccountName }}
+{{ dict "envAll" $envAll "application" "coriolis" | include "helm-toolkit.snippets.kubernetes_pod_security_context" | indent 6 }}
+      affinity:
+{{ tuple $envAll "coriolis" "web" | include "helm-toolkit.snippets.kubernetes_pod_anti_affinity" | indent 8 }}
+      nodeSelector:
+        {{ .Values.labels.web.node_selector_key }}: {{ .Values.labels.web.node_selector_value }}
+{{ if $envAll.Values.pod.tolerations.coriolis.enabled }}
+{{ tuple $envAll "coriolis" | include "helm-toolkit.snippets.kubernetes_tolerations" | indent 6 }}
+{{ end }}
+      terminationGracePeriodSeconds: {{ .Values.pod.lifecycle.termination_grace_period.web.timeout | default "30" }}
+      initContainers:
+{{ tuple $envAll "dashboard" $mounts_coriolis_init | include "helm-toolkit.snippets.kubernetes_entrypoint_init_container" | indent 8 }}
+      containers:
+        - name: coriolis-web
+{{ tuple $envAll "coriolis" | include "helm-toolkit.snippets.image" | indent 10 }}
+{{ tuple $envAll $envAll.Values.pod.resources.web | include "helm-toolkit.snippets.kubernetes_resources" | indent 10 }}
+{{ dict "envAll" $envAll "application" "coriolis" "container" "coriolis" | include "helm-toolkit.snippets.kubernetes_container_security_context" | indent 10 }}
+          command:
+            - /tmp/coriolis.sh
+            - start
+          env:
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+{{- if or .Values.manifests.certificates .Values.tls.identity }}
+          - name: REQUESTS_CA_BUNDLE
+            value: "/etc/openstack-dashboard/certs/ca.crt"
+{{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /tmp/coriolis.sh
+                  - stop
+          ports:
+            - name: web
+              containerPort: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+          readinessProbe:
+            httpGet:
+              scheme: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.keystone_endpoint_scheme_lookup" | upper }}
+              path: /
+              port: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              scheme: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.keystone_endpoint_scheme_lookup" | upper }}
+              path: /
+              port: {{ tuple "dashboard" "internal" "web" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+            initialDelaySeconds: 180
+            periodSeconds: 60
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: pod-tmp
+              mountPath: /tmp
+            - name: static-coriolis
+              mountPath: /var/www/html/
+            - name: coriolis-bin
+              mountPath: /tmp/coriolis.sh
+              subPath: coriolis.sh
+              readOnly: true
+            - name: coriolis-bin
+              mountPath: /tmp/manage.py
+              subPath: manage.py
+              readOnly: true
+            - name: coriolis-etc
+              mountPath: {{ .Values.conf.software.apache2.site_dir }}/000-default.conf
+              subPath: coriolis.conf
+              readOnly: true
+            {{- if .Values.conf.coriolis.security }}
+            - name: coriolis-etc
+              mountPath: {{ .Values.conf.software.apache2.conf_dir }}/security.conf
+              subPath: security.conf
+              readOnly: true
+            {{- end }}
+            - name: coriolis-bin
+              mountPath: /var/www/cgi-bin/coriolis/django.wsgi
+              subPath: django.wsgi
+              readOnly: true
+            - name: coriolis-etc
+              mountPath: /etc/openstack-dashboard/local_settings
+              subPath: local_settings
+              readOnly: true
+            {{- range $key, $value := $envAll.Values.conf.coriolis.custom_panels }}
+            {{- $customPanelsFile := printf "/etc/openstack-dashboard/custom_panels/%s.py" $key }}
+            - name: coriolis-etc
+              mountPath: {{ $customPanelsFile }}
+              subPath: {{ base $customPanelsFile }}
+              readOnly: true
+            {{- end }}
+            {{- range $key, $value := $envAll.Values.conf.coriolis.policy }}
+            {{- $policyYamlFile := printf "/etc/openstack-dashboard/%s_policy.yaml" $key }}
+            - name: coriolis-etc
+              mountPath: {{ $policyYamlFile }}
+              subPath: {{ base $policyYamlFile }}
+              readOnly: true
+            {{- end }}
+            {{- range $key, $value := $envAll.Values.conf.coriolis.policy }}
+            {{- $policyJsonFile := printf "/etc/openstack-dashboard/%s_policy.json" $key }}
+            - name: coriolis-etc
+              mountPath: {{ $policyJsonFile }}
+              subPath: {{ base $policyJsonFile }}
+              readOnly: true
+            {{- end }}
+            {{- range $key, $value := $envAll.Values.conf.coriolis.local_settings_d }}
+            {{- $localSettingsFile := printf "/etc/openstack-dashboard/local_settings.d/%s.py" $key }}
+            - name: coriolis-etc
+              mountPath: {{ $localSettingsFile }}
+              subPath: {{ base $localSettingsFile }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.manifests.configmap_logo }}
+            - name: coriolis-logo
+              mountPath: /tmp/logo.svg
+              subPath: logo.svg
+            - name: coriolis-logo
+              mountPath: /tmp/logo-splash.svg
+              subPath: logo-splash.svg
+            - name: coriolis-logo
+              mountPath: /tmp/favicon.ico
+              subPath: favicon.ico
+            {{- end }}
+{{- dict "enabled" (or $envAll.Values.manifests.certificates $envAll.Values.tls.identity) "name" $envAll.Values.secrets.tls.dashboard.dashboard.internal "path" "/etc/openstack-dashboard/certs" | include "helm-toolkit.snippets.tls_volume_mount" | indent 12 }}
+{{- dict "enabled" $envAll.Values.manifests.certificates "name" $envAll.Values.endpoints.oslo_db.auth.admin.secret.tls.internal "path" "/etc/mysql/certs" | include "helm-toolkit.snippets.tls_volume_mount" | indent 12 }}
+{{ if $mounts_coriolis.volumeMounts }}{{ toYaml $mounts_coriolis.volumeMounts | indent 12 }}{{ end }}
+      volumes:
+        - name: pod-tmp
+          emptyDir: {}
+        - name: wsgi-coriolis
+          emptyDir: {}
+        - name: static-coriolis
+          emptyDir: {}
+        - name: coriolis-bin
+          configMap:
+            name: coriolis-bin
+            defaultMode: 0555
+        - name: coriolis-etc
+          secret:
+            secretName: coriolis-etc
+            defaultMode: 0444
+        {{- if .Values.manifests.configmap_logo }}
+        - name: coriolis-logo
+          configMap:
+            name: coriolis-logo
+        {{- end }}
+{{- dict "enabled" $envAll.Values.manifests.certificates "name" $envAll.Values.endpoints.oslo_db.auth.admin.secret.tls.internal | include "helm-toolkit.snippets.tls_volume" | indent 8 }}
+{{- dict "enabled" (or $envAll.Values.manifests.certificates $envAll.Values.tls.identity) "name" $envAll.Values.secrets.tls.dashboard.dashboard.internal | include "helm-toolkit.snippets.tls_volume" | indent 8 }}
+{{ if $mounts_coriolis.volumes }}{{ toYaml $mounts_coriolis.volumes | indent 8 }}{{ end }}
+{{- end }}

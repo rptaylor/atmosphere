@@ -1,0 +1,388 @@
+# Copyright (c) 2024 VEXXHOST, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+# Default values for Coriolis.
+# This is a YAML-formatted file.
+# Declare name/value pairs to be passed into your templates.
+# name: value
+
+---
+images:
+  tags:
+    db_init: docker.io/openstackhelm/heat:stein-ubuntu_bionic
+    coriolis_db_sync: registry.atmosphere.dev/library/coriolis:main
+    db_drop: docker.io/openstackhelm/heat:stein-ubuntu_bionic
+    coriolis_web: registry.atmosphere.dev/library/coriolis-web:main
+    dep_check: quay.io/airshipit/kubernetes-entrypoint:v1.0.0
+    image_repo_sync: docker.io/docker:17.07.0
+  pull_policy: "IfNotPresent"
+  local_registry:
+    active: false
+    exclude:
+      - dep_check
+      - image_repo_sync
+
+release_group: null
+
+labels:
+  web:
+    node_selector_key: openstack-control-plane
+    node_selector_value: enabled
+  job:
+    node_selector_key: openstack-control-plane
+    node_selector_value: enabled
+
+network:
+  migration_dashboard:
+    ingress:
+      public: true
+      classes:
+        namespace: "nginx"
+        cluster: "nginx-cluster"
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+  external_policy_local: false
+  node_port:
+    enabled: false
+    port: 31000
+
+conf:
+  coriolis:
+    database:
+      max_retries: -1
+  policy: {}
+
+dependencies:
+  dynamic:
+    common:
+      local_image_registry:
+        jobs:
+          - horizon-image-repo-sync
+        services:
+          - endpoint: node
+            service: local_image_registry
+  static:
+    dashboard:
+      jobs:
+        - coriolis-db-sync
+      services:
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: identity
+    db_drop:
+      services:
+        - endpoint: internal
+          service: oslo_db
+    db_init:
+      services:
+        - endpoint: internal
+          service: oslo_db
+    db_sync:
+      jobs:
+        - coriolis-db-init
+      services:
+        - endpoint: internal
+          service: oslo_db
+    image_repo_sync:
+      services:
+        - endpoint: internal
+          service: local_image_registry
+
+pod:
+  security_context:
+    coriolis_web:
+      pod:
+        runAsUser: 42424
+      container:
+        coriolis_web:
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+          runAsUser: 0
+    db_sync:
+      pod:
+        runAsUser: 42424
+      container:
+        horizon_db_sync:
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+          runAsUser: 0
+  affinity:
+    anti:
+      type:
+        default: preferredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
+      weight:
+        default: 10
+  tolerations:
+    coriolis:
+      enabled: false
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+  mounts:
+    coriolis_db_init:
+      init_container: null
+      coriolis_db_init:
+        volumeMounts:
+        volumes:
+    coriolis_db_sync:
+      init_container: null
+      coriolis_db_sync:
+        volumeMounts:
+        volumes:
+    coriolis_web:
+      init_container: null
+      coriolis_web:
+        volumeMounts:
+        volumes:
+  replicas:
+    web: 1
+  lifecycle:
+    upgrades:
+      deployments:
+        revision_history: 3
+        pod_replacement_strategy: RollingUpdate
+        rolling_update:
+          max_unavailable: 1
+          max_surge: 3
+    disruption_budget:
+      web:
+        min_available: 0
+    termination_grace_period:
+      web:
+        timeout: 30
+  resources:
+    enabled: false
+    server:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "1024Mi"
+        cpu: "2000m"
+    jobs:
+      db_init:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "1024Mi"
+          cpu: "2000m"
+      db_sync:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "1024Mi"
+          cpu: "2000m"
+      db_drop:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "1024Mi"
+          cpu: "2000m"
+      image_repo_sync:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "1024Mi"
+          cpu: "2000m"
+
+# Names of secrets used by bootstrap and environmental checks
+secrets:
+  identity:
+    admin: coriolis-keystone-admin
+  oslo_db:
+    admin: coriolis-db-admin
+    coriolis: coriolis-db-user
+  tls:
+    dashboard:
+      dashboard:
+        public: horizon-tls-public
+        internal: horizon-tls-web
+  oci_image_registry:
+    horizon: horizon-oci-image-registry
+
+tls:
+  identity: false
+
+# typically overridden by environmental
+# values, but should include all endpoints
+# required by this chart
+endpoints:
+  cluster_domain_suffix: cluster.local
+  local_image_registry:
+    name: docker-registry
+    namespace: docker-registry
+    hosts:
+      default: localhost
+      internal: docker-registry
+      node: localhost
+    host_fqdn_override:
+      default: null
+    port:
+      registry:
+        node: 5000
+  oci_image_registry:
+    name: oci-image-registry
+    namespace: oci-image-registry
+    auth:
+      enabled: false
+      coriolis:
+        username: coriolis
+        password: password
+    hosts:
+      default: localhost
+    host_fqdn_override:
+      default: null
+    port:
+      registry:
+        default: null
+  identity:
+    name: keystone
+    auth:
+      admin:
+        region_name: RegionOne
+        username: admin
+        password: password
+        project_name: admin
+        user_domain_name: default
+        project_domain_name: default
+    hosts:
+      default: keystone
+      internal: keystone-api
+    host_fqdn_override:
+      default: null
+    path:
+      default: /v3
+    scheme:
+      default: http
+    port:
+      api:
+        default: 80
+        internal: 5000
+  oslo_cache:
+    hosts:
+      default: memcached
+    host_fqdn_override:
+      default: null
+    port:
+      memcache:
+        default: 11211
+  migration_dashboard:
+    name: coriolis-web
+    hosts:
+      default: coriolis-web
+    host_fqdn_override:
+      default: null
+      # NOTE(portdirect): this chart supports TLS for fqdn over-ridden public
+      # endpoints using the following format:
+      # public:
+      #   host: null
+      #   tls:
+      #     crt: null
+      #     key: null
+    path:
+      default: null
+    scheme:
+      default: http
+    port:
+      web:
+        default: 80
+  oslo_db:
+    auth:
+      admin:
+        username: root
+        password: password
+        secret:
+          tls:
+            internal: mariadb-tls-direct
+      coriolis:
+        username: coriolis
+        password: password
+    hosts:
+      default: mariadb
+    host_fqdn_override:
+      default: null
+    path: /coriolis
+    scheme: mysql+pymysql
+    port:
+      mysql:
+        default: 3306
+  # NOTE(tp6510): these endpoints allow for things like DNS lookups and ingress
+  # They are using to enable the Egress K8s network policy.
+  kube_dns:
+    namespace: kube-system
+    name: kubernetes-dns
+    hosts:
+      default: kube-dns
+    host_fqdn_override:
+      default: null
+    path:
+      default: null
+    scheme: http
+    port:
+      dns:
+        default: 53
+        protocol: UDP
+  ingress:
+    namespace: null
+    name: ingress
+    hosts:
+      default: ingress
+    port:
+      ingress:
+        default: 80
+
+network_policy:
+  coriolis:
+    ingress:
+      - {}
+    egress:
+      - {}
+
+# NOTE(helm_hook): helm_hook might break for helm2 binary.
+# set helm3_hook: false when using the helm2 binary.
+helm3_hook: true
+
+manifests:
+  certificates: false
+  configmap_bin: true
+  configmap_etc: true
+  configmap_logo: false
+  deployment_web: true
+  ingress_web: true
+  job_db_init: true
+  job_db_sync: true
+  job_db_drop: false
+  job_image_repo_sync: true
+  pdb_web: true
+  network_policy: false
+  secret_db: true
+  secret_ingress_tls: true
+  secret_keystone: true
+  secret_registry: true
+  service_ingress_web: true
+  service_web: true
+...

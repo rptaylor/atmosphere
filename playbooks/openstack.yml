@@ -28,6 +28,10 @@
       tags:
         - barbican
 
+    - role: coriolis
+      tags:
+        - coriolis
+
     - role: rook_ceph
       when: atmosphere_ceph_enabled | default(true)
       tags:

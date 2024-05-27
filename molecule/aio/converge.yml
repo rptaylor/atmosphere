@@ -12,20 +12,20 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-- name: Install Ceph
-  ansible.builtin.import_playbook: vexxhost.atmosphere.ceph
+# - name: Install Ceph
+#   ansible.builtin.import_playbook: vexxhost.atmosphere.ceph
 
-- name: Install Kubernetes
-  ansible.builtin.import_playbook: vexxhost.atmosphere.kubernetes
+# - name: Install Kubernetes
+#   ansible.builtin.import_playbook: vexxhost.atmosphere.kubernetes
 
-- name: Install CSI
-  ansible.builtin.import_playbook: vexxhost.atmosphere.csi
+# - name: Install CSI
+#   ansible.builtin.import_playbook: vexxhost.atmosphere.csi
 
-- name: Deploy Infrastructure
-  ansible.builtin.import_playbook: vexxhost.atmosphere.infrastructure
+# - name: Deploy Infrastructure
+#   ansible.builtin.import_playbook: vexxhost.atmosphere.infrastructure
 
-- name: Deploy Monitoring stack
-  ansible.builtin.import_playbook: vexxhost.atmosphere.monitoring
+# - name: Deploy Monitoring stack
+#   ansible.builtin.import_playbook: vexxhost.atmosphere.monitoring
 
 - name: Deploy OpenStack
   ansible.builtin.import_playbook: vexxhost.atmosphere.openstack

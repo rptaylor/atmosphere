@@ -1,0 +1,12 @@
+apiVersion: v1
+appVersion: v1.0.0
+description: Cloud Migration as a Service
+home: https://github.com/cloudbase/coriolis
+icon: https://github.com/cloudbase/coriolis-web/raw/stable/2403/src/components/ui/Logo/images/coriolis-small-black.svg
+maintainers:
+- name: VEXXHOST, Inc.
+name: coriolis
+sources:
+- https://github.com/cloudbase/coriolis
+- https://github.com/cloudbase/coriolis-web
+version: 0.1.0

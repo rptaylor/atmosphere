@@ -1,0 +1,79 @@
+From 6d0439bacdd8f02fe4be4528f9f1c09ad93db4dd Mon Sep 17 00:00:00 2001
+From: Mohammed Naser <mnaser@vexxhost.com>
+Date: Mon, 27 May 2024 15:36:06 -0400
+Subject: [PATCH] Add missing charset
+
+The missing charset causes migrations to fail to run
+---
+ .../versions/014_adds_worker_service_regions.py      | 12 ++++++++----
+ .../versions/016_adds_minion_vm_pools.py             |  6 ++++--
+ 2 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/coriolis/db/sqlalchemy/migrate_repo/versions/014_adds_worker_service_regions.py b/coriolis/db/sqlalchemy/migrate_repo/versions/014_adds_worker_service_regions.py
+index 451a2dce..7691bc1a 100644
+--- a/coriolis/db/sqlalchemy/migrate_repo/versions/014_adds_worker_service_regions.py
++++ b/coriolis/db/sqlalchemy/migrate_repo/versions/014_adds_worker_service_regions.py
+@@ -31,7 +31,8 @@ def upgrade(migrate_engine):
+             sqlalchemy.Column('deleted', sqlalchemy.String(36)),
+             sqlalchemy.Column(
+                 'enabled', sqlalchemy.Boolean, nullable=True,
+-                default=lambda: False)))
++                default=lambda: False),
++            mysql_engine='InnoDB', mysql_charset='utf8'))
+ 
+     # declare endpoint-region-mapping table:
+     tables.append(
+@@ -56,7 +57,8 @@ def upgrade(migrate_engine):
+             sqlalchemy.Column('created_at', sqlalchemy.DateTime),
+             sqlalchemy.Column('updated_at', sqlalchemy.DateTime),
+             sqlalchemy.Column('deleted_at', sqlalchemy.DateTime),
+-            sqlalchemy.Column('deleted', sqlalchemy.String(36))))
++            sqlalchemy.Column('deleted', sqlalchemy.String(36)),
++            mysql_engine='InnoDB', mysql_charset='utf8'))
+ 
+     # declare service table:
+     tables.append(
+@@ -87,7 +89,8 @@ def upgrade(migrate_engine):
+             sqlalchemy.Column('created_at', sqlalchemy.DateTime),
+             sqlalchemy.Column('updated_at', sqlalchemy.DateTime),
+             sqlalchemy.Column('deleted_at', sqlalchemy.DateTime),
+-            sqlalchemy.Column('deleted', sqlalchemy.String(36))))
++            sqlalchemy.Column('deleted', sqlalchemy.String(36)),
++            mysql_engine='InnoDB', mysql_charset='utf8'))
+ 
+     # declare service-region mappings table:
+     tables.append(
+@@ -112,7 +115,8 @@ def upgrade(migrate_engine):
+             sqlalchemy.Column('created_at', sqlalchemy.DateTime),
+             sqlalchemy.Column('updated_at', sqlalchemy.DateTime),
+             sqlalchemy.Column('deleted_at', sqlalchemy.DateTime),
+-            sqlalchemy.Column('deleted', sqlalchemy.String(36))))
++            sqlalchemy.Column('deleted', sqlalchemy.String(36)),
++            mysql_engine='InnoDB', mysql_charset='utf8'))
+ 
+     for index, table in enumerate(tables):
+         try:
+diff --git a/coriolis/db/sqlalchemy/migrate_repo/versions/016_adds_minion_vm_pools.py b/coriolis/db/sqlalchemy/migrate_repo/versions/016_adds_minion_vm_pools.py
+index 975aeb99..c54a5acf 100644
+--- a/coriolis/db/sqlalchemy/migrate_repo/versions/016_adds_minion_vm_pools.py
++++ b/coriolis/db/sqlalchemy/migrate_repo/versions/016_adds_minion_vm_pools.py
+@@ -69,7 +69,8 @@ def upgrade(migrate_engine):
+                 'minion_max_idle_time', sqlalchemy.Integer, nullable=False),
+             sqlalchemy.Column(
+                 'minion_retention_strategy', sqlalchemy.String(255),
+-                nullable=False)))
++                nullable=False,
++            mysql_engine='InnoDB', mysql_charset='utf8'))
+ 
+     # declare minion machine table:
+     tables.append(
+@@ -106,7 +107,8 @@ def upgrade(migrate_engine):
+                 nullable=True),
+             sqlalchemy.Column(
+                 'provider_properties', sqlalchemy.Text,
+-                nullable=True)))
++                nullable=True),
++            mysql_engine='InnoDB', mysql_charset='utf8'))
+ 
+     tables.append(sqlalchemy.Table(
+         'minion_pool_event', meta,
