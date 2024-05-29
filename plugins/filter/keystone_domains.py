@@ -56,6 +56,12 @@ def keystone_domains_to_mounts(domains):
         }
         for d in domains
         for f in ["client", "conf", "provider"]
+    ] + [
+        {
+            "name": "etc-ssl-certs",
+            "mountPath": "/etc/ssl/certs",
+            "readOnly": True,
+        }
     ]
 
 

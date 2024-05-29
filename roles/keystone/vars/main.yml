@@ -27,6 +27,9 @@ _keystone_helm_values:
             - name: keystone-openid-metadata
               configMap:
                 name: keystone-openid-metadata
+            - name: etc-ssl-certs
+              hostPath:
+                path: /etc/ssl/certs
   conf:
     keystone:
       DEFAULT:
